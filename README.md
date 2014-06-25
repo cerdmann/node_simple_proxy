@@ -9,6 +9,14 @@ Install
         cd node_simple_proxy
         npm install
 
+        Modify config/config.js with ip and port of statsd server
+
 Usage
 -----
-        node proxy.js {destination server} {destination_port}
+        node proxy.js {port to listen on}
+        
+        Hook up a browser to use proxy port used when starting proxy.js
+        
+        Browse a site
+        
+        View stats in graphite
