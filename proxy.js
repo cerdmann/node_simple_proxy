@@ -14,29 +14,45 @@
 
 var http = require( 'http' );
 var url = require( 'url' );
-//var map = require( 'through2-map' );
+var config = require( './config/config' );
+var lynx = require( 'lynx' );
 
-var destination_base = process.argv[ 2 ];
-var destination_port = process.argv[ 3 ];
+var port = process.argv[ 2 ];
+
+var metrics = new lynx( config.statsd_ip, config.statsd_port, {} );
 
 var server = http.createServer( function( request, response ) {
-  var parsed_url = url.parse( request.url, true );
-  
+  var parsed_url = url.parse( request.url, false );
+
   var options = {
-    hostname  : destination_base,
-    port      : destination_port,
+    hostname  : parsed_url.hostname,
+    port      : parsed_url.port,
     method    : request.method,
     path      : parsed_url.path,
-    headers   : request.headers
+    headers   : request.headers,
+    auth      : request.auth
   };
+  var start_request_time = process.hrtime();
+  
+  var proxied_request = http.request( options, function( proxied_res ) {
 
-  var follow_on_request = http.request( options, function( proxied_res ) {
-    console.log( 'STATUS: ' + proxied_res.statusCode );
+    response.writeHead( proxied_res.statusCode, proxied_res.headers );
+    proxied_res.on( 'end', function() {
+      var elapsed = process.hrtime( start_request_time )[1] / 1000000;
+      var hostname = options.hostname.replace( /\./g, '_' );
+      var pathname = parsed_url.pathname.replace( /\//g, '.' ); 
+      var stat =  'http.' + options.method + '.' + hostname + pathname; 
+                  
+      console.log( stat + elapsed.toFixed( 0 ) );
+      response.end();
+      metrics.timing( stat, elapsed.toFixed( 0 ) );
+    });
     proxied_res.pipe( response );
+
   });
-  follow_on_request.end();
+  proxied_request.end();
 });
 
-server.listen( 8000 );
+server.listen( port );
 
-console.log( 'Server listening on port: 8000 ' );
+console.log( 'Server listening on port: ' + port.toString() );
