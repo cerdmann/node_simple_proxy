@@ -37,19 +37,25 @@ var server = http.createServer( function( request, response ) {
   var proxied_request = http.request( options, function( proxied_res ) {
 
     response.writeHead( proxied_res.statusCode, proxied_res.headers );
+
     proxied_res.on( 'end', function() {
       var elapsed = process.hrtime( start_request_time )[1] / 1000000;
       var hostname = options.hostname.replace( /\./g, '_' );
       var pathname = parsed_url.pathname.replace( /\//g, '.' ); 
-      var stat =  'http.' + options.method + '.' + hostname + pathname; 
+      var stat =  'http.' + options.method + '.' + hostname + 
+                  pathname + '.responsetime'; 
                   
-      console.log( stat + elapsed.toFixed( 0 ) );
       response.end();
-      metrics.timing( stat, elapsed.toFixed( 0 ) );
+      metrics.timing( stat, elapsed.toFixed( 0 ), 1 );
     });
     proxied_res.pipe( response );
 
   });
+
+  proxied_request.on( 'error', function( error ) {
+    console.log( 'ERROR: ' + error.message );
+  });
+
   proxied_request.end();
 });
 
